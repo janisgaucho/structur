@@ -53,6 +53,28 @@ export async function getProjects() {
 }
 
 /**
+ * Récupère les valeurs possibles pour l'enum 'user_role' depuis la base de données.
+ */
+export async function getRoles(): Promise<string[]> {
+  const supabaseAdmin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  // Exécute une requête SQL pour lister les valeurs de l'enum 'user_role'
+  const { data, error } = await supabaseAdmin.rpc('get_enum_values', {
+    type_name: 'user_role'
+  });
+
+  if (error) {
+    console.error("Erreur Supabase [getRoles]:", error);
+    // Retourne une liste vide en cas d'erreur pour ne pas afficher de fausses données.
+    return [];
+  }
+
+  return data || [];
+}
+/**
  * Ajoute un nouvel utilisateur (auth) et son profil.
  * Nécessite les droits d'administration (service_role).
  */
@@ -73,10 +95,15 @@ export async function addUser(formData: FormData) {
   const firstName = formData.get('first_name') as string;
   const lastName = formData.get('last_name') as string;
   const role = formData.get('role') as string;
-  const projectId = formData.get('project_id') as string | null;
 
   // Étape 1: Créer l'utilisateur dans Supabase Auth
-  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email);
+  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+    data: {
+      first_name: formData.get('first_name'),
+      last_name: formData.get('last_name'),
+    },
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/creation-mot-de-passe`
+  });
 
   if (authError || !authData.user) {
     console.error("Erreur Supabase Auth [addUser]:", authError);
@@ -103,8 +130,13 @@ export async function addUser(formData: FormData) {
     return { error: profileError.message || "Erreur lors de la création du profil." };
   }
 
-  // Étape 3: Si un chantier est sélectionné, lier l'utilisateur au chantier
-  if (projectId) {
+  // Nettoyage rigoureux de l'ID du chantier
+  const rawProjectId = formData.get('project_id');
+  const projectId = typeof rawProjectId === 'string' ? rawProjectId.trim() : null;
+  const isValidProject = projectId && projectId !== 'undefined' && projectId !== 'null' && projectId !== '';
+
+  // Étape 3: Si un chantier est sélectionné de manière valide, lier l'utilisateur
+  if (isValidProject) {
     const { error: memberError } = await supabaseAdmin
       .from('project_members')
       .insert({
@@ -112,12 +144,14 @@ export async function addUser(formData: FormData) {
         user_id: authData.user.id,
         role: role, // Le rôle sur le projet est le même que son rôle général
       });
-
+  
     if (memberError) {
       console.error("Erreur Supabase [addUser to project]:", memberError);
-      return { error: "Erreur lors de l'assignation au chantier." };
+      // On renvoie le message d'erreur natif pour faciliter le débogage
+      return { error: `Erreur d'assignation : ${memberError.message}` };
     }
   }
+
 
   revalidatePath('/dashboard/equipe');
   return { success: true };
@@ -140,7 +174,18 @@ export async function updateUser(userId: string, formData: FormData) {
   const firstName = formData.get('first_name') as string;
   const lastName = formData.get('last_name') as string;
   const role = formData.get('role') as string;
-  const projectId = formData.get('project_id') as string | null;
+
+  const projectIdsRaw = formData.get('project_ids') as string | null;
+  let projectIds: string[] = [];
+  if (projectIdsRaw) {
+    try {
+      // On filtre les valeurs "null" ou "undefined" qui pourraient venir du formulaire
+      const parsed = JSON.parse(projectIdsRaw);
+      projectIds = Array.isArray(parsed) ? parsed.filter(id => id && id !== 'null' && id !== 'undefined') : [];
+    } catch (e) {
+      console.error("Erreur parsing project_ids", e);
+    }
+  }
 
   // Étape 1: Mettre à jour le profil dans la table 'profiles'
   const { error: profileError } = await supabaseAdmin
@@ -166,22 +211,33 @@ export async function updateUser(userId: string, formData: FormData) {
     return { error: authError.message || "Erreur lors de la mise à jour de l'email." };
   }
 
-  // Étape 3: Gérer l'assignation au chantier
-  if (projectId) {
-    const { error: memberError } = await supabaseAdmin
-      .from('project_members')
-      .upsert(
-        {
-          project_id: projectId,
-          user_id: userId,
-          role: role,
-        },
-        { onConflict: 'user_id' } // Si l'utilisateur est déjà assigné, met à jour son chantier.
-      );
+  // Étape 3: Gérer les assignations aux chantiers (relation plusieurs-à-plusieurs)
+  // a. On supprime d'abord les anciennes assignations de cet utilisateur
+  const { error: deleteError } = await supabaseAdmin
+    .from('project_members')
+    .delete()
+    .eq('user_id', userId);
 
-    if (memberError) {
-      console.error("Erreur Supabase [updateUser project assignment]:", memberError);
-      return { error: "Erreur lors de l'assignation au chantier." };
+  if (deleteError) {
+    console.error("Erreur Supabase [updateUser project cleanup]:", deleteError);
+    return { error: "Erreur lors du nettoyage des anciens chantiers." };
+  }
+
+  // b. On insère les nouvelles assignations s'il y en a
+  if (projectIds.length > 0) {
+    const insertData = projectIds.map(projectId => ({
+      project_id: projectId,
+      user_id: userId,
+      role: role,
+    }));
+
+    const { error: insertError } = await supabaseAdmin
+      .from('project_members')
+      .insert(insertData);
+
+    if (insertError) {
+      console.error("Erreur Supabase [updateUser project assignment]:", insertError);
+      return { error: `Erreur lors de l'assignation : ${insertError.message}` };
     }
   }
 

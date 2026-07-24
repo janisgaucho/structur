@@ -24,11 +24,12 @@ async function analyzeWithRetry(base64Data: string, mimeType: string) {
   const primaryModel = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
   const fallbackModel = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite' });
 
-  const prompt = `Analyse ce devis de travaux et retourne UNIQUEMENT un objet JSON valide avec les clés suivantes :
+  const prompt = `Analyse ce devis de travaux et retourne UNIQUEMENT un objet JSON valide avec les clés suivantes. Sépare bien les actions (verbe à l'infinitif) des matériaux :
   - "reference" (ex: D-260449)
   - "client_name" (Le nom de famille ou l'entreprise, ex: NGO)
   - "client_address" (L'adresse d'intervention complète, ex: 4 Allée Bougainville 77200 Torcy France)
-  - "tasks" (Un tableau de chaînes de caractères listant uniquement la désignation de chaque ligne de travaux du tableau, ex: ["Dépose papiers peint, enduit...", "Pose de carrelage au sol"])
+  - "tasks" (Un tableau de chaînes de caractères listant uniquement les actions à réaliser, ex: ["Dépose papiers peint, enduit...", "Pose de carrelage au sol"])
+  - "supplies" (Un tableau de chaînes de caractères listant uniquement les matériaux et fournitures, ex: ["Peinture Tollens Blanc Mat", "Carrelage 60x60cm"])
   - "total_ttc" (Le montant total TTC, ex: 429,00)
   Ne renvoie aucun autre texte, pas de balises markdown, uniquement le JSON pur.`;
 
@@ -96,7 +97,10 @@ Adresse: ${extractedData.client_address}
 Montant total: ${extractedData.total_ttc} € TTC
 
 Travaux à réaliser :
-- ${extractedData.tasks.join('\n- ')}`;
+- ${extractedData.tasks.join('\n- ')}
+
+Fournitures :
+- ${extractedData.supplies?.join('\n- ') || 'Aucune fourniture détaillée'}`;
   
     // --- PLACE ICI LA SUITE DE TON CODE (L'insertion dans Supabase projects & project_members) ---
     // 1. Création du chantier

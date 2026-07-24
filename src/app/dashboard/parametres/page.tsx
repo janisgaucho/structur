@@ -1,6 +1,7 @@
 // src/app/dashboard/parametres/page.tsx
 "use client";
 
+import { useDictionary } from "@/components/DictionaryProvider";
 import { useState, useEffect } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -8,6 +9,7 @@ import { createClient } from "@/utils/supabase/client"; // Ajuste ce chemin selo
 
 export default function SettingsPage() {
   const router = useRouter();
+  const dict = useDictionary();
   
   // États pour stocker la prévisualisation visuelle
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -16,7 +18,9 @@ export default function SettingsPage() {
   // États pour stocker les fichiers physiques à envoyer
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [faviconFile, setFaviconFile] = useState<File | null>(null);
+  const [companyName, setCompanyName] = useState('');
 
+  const [userRole, setUserRole] = useState<string | null>(null);
   // État de chargement pour le bouton
   const [isSaving, setIsSaving] = useState(false);
   const supabase = createClient();
@@ -28,7 +32,7 @@ export default function SettingsPage() {
 
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('logo_url, favicon_url')
+        .select('logo_url, favicon_url, company_name, role')
         .eq('id', user.id)
         .single();
 
@@ -39,9 +43,11 @@ export default function SettingsPage() {
 
       if (profile?.logo_url) setLogoPreview(profile.logo_url);
       if (profile?.favicon_url) setFaviconPreview(profile.favicon_url);
+      if (profile?.company_name) setCompanyName(profile.company_name);
+      if (profile?.role) setUserRole(profile.role);
     };
     fetchInitialImages();
-  }, []);
+  }, [supabase]);
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -60,7 +66,7 @@ export default function SettingsPage() {
   };
 
   const handleSaveChanges = async () => {
-    if (!logoFile && !faviconFile) return;
+    if (!logoFile && !faviconFile && !companyName) return;
     
     setIsSaving(true);
 
@@ -69,6 +75,12 @@ export default function SettingsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Non autorisé");
 
+      // 1.5. Gestion du nom de l'entreprise
+      if (companyName) {
+        await supabase.from('profiles')
+          .update({ company_name: companyName })
+          .eq('id', user.id);
+      }
       // 2. Gestion du Logo
       if (logoFile) {
         const logoPath = `logos/${user.id}-${Date.now()}`;
@@ -131,94 +143,114 @@ Détail : ${errorMessage}`);
 
       <div className="w-full max-w-4xl mx-auto px-4 flex flex-col">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 text-left mb-1">Paramètres de l'espace</h1>
-          <p className="text-gray-500 text-left mb-8">Gérez les informations et l'apparence de votre espace de travail.</p>
+          <h1 className="text-3xl font-bold text-gray-900 text-left mb-1">{dict.settings_page_title}</h1>
+          <p className="text-gray-500 text-left mb-8">{dict.settings_page_subtitle}</p>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden w-full">
-          <div className="p-6 border-b border-gray-200 bg-gray-50">
-            <h2 className="text-lg font-medium text-gray-900">Personnalisation</h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Adaptez l'interface aux couleurs de votre entreprise.
-            </p>
-          </div>
+        {userRole !== 'sous_traitant' ? (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden w-full">
+            <div className="p-6 border-b border-gray-200 bg-gray-50">
+              <h2 className="text-lg font-medium text-gray-900">Personnalisation</h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Adaptez l'interface aux couleurs de votre entreprise.
+              </p>
+            </div>
 
-          <div className="p-6 space-y-8">
-            
-            {/* Upload du Logo */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Logo de l'entreprise
-              </label>
-              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 transition-colors">
-                <div className="space-y-4 text-center w-full">
-                  {logoPreview && (
-                    <div className="flex justify-center mb-4">
-                      <img src={logoPreview} alt="Aperçu du logo" className="h-20 object-contain" />
-                    </div>
-                  )}
-                  
-                  <div className="flex text-sm text-gray-600 justify-center">
-                    <label htmlFor="logo-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none">
-                      <span>{logoPreview ? "Changer l'image" : "Téléverser un fichier"}</span>
-                      <input 
-                        id="logo-upload" 
-                        name="logo-upload" 
-                        type="file" 
-                        className="sr-only" 
-                        accept="image/png, image/jpeg, image/svg+xml, image/webp" 
-                        onChange={handleLogoChange}
-                      />
-                    </label>
-                  </div>
-                  <p className="text-xs text-gray-500">PNG, JPG, SVG ou WEBP jusqu'à 2MB</p>
+            <div className="p-6 space-y-8">
+              
+              {/* Nom de l'entreprise */}
+              <div>
+                <label htmlFor="company-name" className="block text-sm font-medium text-gray-700">
+                  Nom de l'entreprise
+                </label>
+                <div className="mt-1">
+                  <input
+                    type="text"
+                    name="company-name"
+                    id="company-name"
+                    className="block w-full px-3 py-2 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    placeholder="Le nom de votre entreprise"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                  />
                 </div>
               </div>
-            </div>
 
-            {/* Upload du Favicon */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Favicon (Icône de l'onglet)
-              </label>
-              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 transition-colors">
-                <div className="space-y-4 text-center w-full">
-                  {faviconPreview && (
-                    <div className="flex justify-center mb-4">
-                      <img src={faviconPreview} alt="Aperçu du favicon" className="h-10 w-10 object-contain rounded-md shadow-sm border border-gray-200" />
+              {/* Upload du Logo */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Logo de l'entreprise
+                </label>
+                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 transition-colors">
+                  <div className="space-y-4 text-center w-full">
+                    {logoPreview && (
+                      <div className="flex justify-center mb-4">
+                        <img src={logoPreview} alt="Aperçu du logo" className="h-20 object-contain" />
+                      </div>
+                    )}
+                    
+                    <div className="flex text-sm text-gray-600 justify-center">
+                      <label htmlFor="logo-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none">
+                        <span>{logoPreview ? "Changer l'image" : "Téléverser un fichier"}</span>
+                        <input 
+                          id="logo-upload" 
+                          name="logo-upload" 
+                          type="file" 
+                          className="sr-only" 
+                          accept="image/png, image/jpeg, image/svg+xml, image/webp" 
+                          onChange={handleLogoChange}
+                        />
+                      </label>
                     </div>
-                  )}
-
-                  <div className="flex text-sm text-gray-600 justify-center">
-                    <label htmlFor="favicon-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none">
-                      <span>{faviconPreview ? "Changer l'image" : "Téléverser un fichier"}</span>
-                      <input 
-                        id="favicon-upload" 
-                        name="favicon-upload" 
-                        type="file" 
-                        className="sr-only" 
-                        accept="image/png, image/x-icon, image/webp" 
-                        onChange={handleFaviconChange}
-                      />
-                    </label>
+                    <p className="text-xs text-gray-500">PNG, JPG, SVG ou WEBP jusqu'à 2MB</p>
                   </div>
-                  <p className="text-xs text-gray-500">Fichier carré recommandé (PNG, ICO, WEBP).</p>
                 </div>
               </div>
-            </div>
 
-            <div className="pt-4">
-              <button 
-                onClick={handleSaveChanges}
-                disabled={isSaving || (!logoFile && !faviconFile)}
-                className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-              >
-                {isSaving ? "Enregistrement..." : "Enregistrer les modifications"}
-              </button>
-            </div>
+              {/* Upload du Favicon */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Favicon (Icône de l'onglet)
+                </label>
+                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 transition-colors">
+                  <div className="space-y-4 text-center w-full">
+                    {faviconPreview && (
+                      <div className="flex justify-center mb-4">
+                        <img src={faviconPreview} alt="Aperçu du favicon" className="h-10 w-10 object-contain rounded-md shadow-sm border border-gray-200" />
+                      </div>
+                    )}
 
+                    <div className="flex text-sm text-gray-600 justify-center">
+                      <label htmlFor="favicon-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none">
+                        <span>{faviconPreview ? "Changer l'image" : "Téléverser un fichier"}</span>
+                        <input 
+                          id="favicon-upload" 
+                          name="favicon-upload" 
+                          type="file" 
+                          className="sr-only" 
+                          accept="image/png, image/x-icon, image/webp" 
+                          onChange={handleFaviconChange}
+                        />
+                      </label>
+                    </div>
+                    <p className="text-xs text-gray-500">Fichier carré recommandé (PNG, ICO, WEBP).</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4">
+                <button 
+                  onClick={handleSaveChanges}
+                  disabled={isSaving || (!logoFile && !faviconFile && !companyName)}
+                  className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  {isSaving ? "Enregistrement..." : "Enregistrer les modifications"}
+                </button>
+              </div>
+
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
     </div>
   );

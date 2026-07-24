@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { MultiSelect } from "@/components/ui/multi-select"
 
 type Project = {
   id: string;
@@ -34,10 +35,22 @@ type User = {
   role: string | null;
 };
 
-export function EditUserModal({ user, projects }: { user: User, projects: Project[] }) {
+export function EditUserModal({ user, projects, roles }: { user: User, projects: Project[], roles: any[] }) {
   const dict = useDictionary()
   const [open, setOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [selectedRole, setSelectedRole] = useState<string>(user.role || '')
+  const [selectedProjects, setSelectedProjects] = useState<string[]>([])
+
+  const getRoleDisplayName = (val: string) => {
+    if (!val) return "";
+    let displayName = (dict as Record<string, string>)[`equipe_role_${val}`];
+    if (!displayName) {
+      const withSpaces = val.replace(/_/g, ' ');
+      displayName = withSpaces.charAt(0).toUpperCase() + withSpaces.slice(1);
+    }
+    return displayName;
+  }
 
   const handleFormAction = async (formData: FormData) => {
     const result = await updateUser(user.id, formData)
@@ -61,10 +74,12 @@ export function EditUserModal({ user, projects }: { user: User, projects: Projec
     }
   }
 
+  const projectOptions = projects.map(p => ({ label: p.name, value: p.id }))
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger>
-        <button className="text-blue-600 hover:text-blue-800 font-medium transition-colors">
+      <DialogTrigger asChild>
+        <button className="text-blue-600 hover:text-blue-800 font-medium transition-colors cursor-pointer">
           {dict.equipe_bouton_modifier || 'Modifier'}
         </button>
       </DialogTrigger>
@@ -85,44 +100,56 @@ export function EditUserModal({ user, projects }: { user: User, projects: Projec
             </div>
             <div className="grid gap-2">
               <Label htmlFor="email">{dict.equipe_col_email}</Label>
-              <input id="email" name="email" type="email" required defaultValue={user.email || ''} className="w-full bg-gray-50 border border-gray-200 px-3 py-2 rounded-lg" />
+              <input id="email" name="email" type="email" required defaultValue={user.email || ''} className="w-full bg-gray-200 text-gray-500 cursor-not-allowed border border-gray-200 px-3 py-2 rounded-lg" readOnly />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="role">{dict.equipe_label_role}</Label>
-              <Select name="role" required defaultValue={user.role || 'artisan'}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder={dict.equipe_label_role} />
+              <Select name="role" required value={selectedRole} onValueChange={(val) => setSelectedRole(val || '')}>
+                <SelectTrigger className="w-full bg-gray-50 border border-gray-200 px-3 py-5 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
+                  <SelectValue placeholder={dict.equipe_label_role}>
+                    {selectedRole ? getRoleDisplayName(selectedRole) : undefined}
+                  </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="artisan">{dict.equipe_role_artisan}</SelectItem>
-                  <SelectItem value="maitre_oeuvre">{dict.equipe_role_moe}</SelectItem>
+                {/* @ts-expect-error - La propriété position est supportée par Radix mais absente des types Shadcn par défaut */}
+                <SelectContent position="popper" side="bottom" sideOffset={4} className="w-[var(--radix-select-trigger-width)] z-50">
+                  {roles.map((roleObj: any) => {
+                    const rawValue = typeof roleObj === 'string' 
+                      ? roleObj 
+                      : (roleObj?.enum_value || roleObj?.enumlabel || Object.values(roleObj)[0]);
+                    if (!rawValue || typeof rawValue !== 'string') return null;
+                    return (
+                      <SelectItem key={rawValue} value={rawValue}>
+                        {getRoleDisplayName(rawValue)}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="project_id">{dict.equipe_label_chantier}</Label>
-              <Select name="project_id">
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder={dict.equipe_placeholder_chantier} />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <MultiSelect
+                options={projectOptions}
+                onValueChange={setSelectedProjects}
+                defaultValue={selectedProjects}
+                placeholder="Sélectionner des chantiers..."
+                maxCount={3}
+                className="w-full bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+              />
             </div>
           </div>
-          <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-between sm:items-center w-full">
+          <input type="hidden" name="role" value={selectedRole} />
+          <input type="hidden" name="project_ids" value={JSON.stringify(selectedProjects)} />
+          <DialogFooter className="-mx-4 -mb-4 mt-6 flex flex-col-reverse items-center gap-2 border-t p-4 sm:flex-row sm:justify-between">
             <button
               type="button"
               onClick={handleDelete}
               disabled={isDeleting}
-              className="text-red-600 hover:text-red-800 text-sm font-medium transition-colors disabled:text-gray-400 disabled:cursor-not-allowed mt-2 sm:mt-0"
+              className="w-full sm:w-auto text-left sm:text-center text-red-600 hover:text-red-800 text-sm font-medium transition-colors disabled:text-gray-400 disabled:cursor-not-allowed mt-4 sm:mt-0 cursor-pointer"
             >
               {isDeleting ? (dict.equipe_bouton_suppression_en_cours || 'Suppression...') : (dict.equipe_bouton_supprimer || 'Supprimer')}
             </button>
-            <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+            <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg cursor-pointer">
               {dict.equipe_bouton_valider_modification || 'Enregistrer les modifications'}
             </button>
           </DialogFooter>

@@ -27,26 +27,43 @@ type Project = {
   name: string;
 };
 
-export function AddUserModal({ projects }: { projects: Project[] }) {
+export function AddUserModal({ projects, roles }: { projects: Project[], roles: any[] }) {
   const dict = useDictionary()
   const [open, setOpen] = useState(false)
+  
+  // 1. Ajout des états locaux pour contrôler l'affichage des Selects
+  const [selectedRole, setSelectedRole] = useState<string>('')
+  const [selectedProject, setSelectedProject] = useState<string>('')
 
   const handleFormAction = async (formData: FormData) => {
     const result = await addUser(formData)
     if (result?.error) {
       alert(result.error)
     } else {
-      setOpen(false) // Ferme la modale en cas de succès
+      setOpen(false) 
+      // 2. On vide les sélections lors de la fermeture ou du succès
+      setSelectedRole('')
+      setSelectedProject('')
     }
+  }
+
+  // 3. Fonction d'aide pour garantir un affichage propre du rôle
+  const getRoleDisplayName = (val: string) => {
+    if (!val) return "";
+    let displayName = (dict as Record<string, string>)[`equipe_role_${val}`];
+    
+    if (!displayName) {
+      const withSpaces = val.replace(/_/g, ' ');
+      displayName = withSpaces.charAt(0).toUpperCase() + withSpaces.slice(1);
+    }
+    return displayName;
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger>
-        <button className="inline-flex items-center justify-center gap-2 bg-[#0071E3] text-white pl-4 pr-5 py-2.5 rounded-full text-sm font-medium hover:bg-[#0077ED] transition-colors shadow-sm">
-          <Plus className="h-4 w-4" />
-          {dict.equipe_bouton_ajouter}
-        </button>
+      <DialogTrigger className="inline-flex items-center justify-center gap-2 bg-[#0071E3] text-white pl-4 pr-5 py-2.5 rounded-full text-sm font-medium hover:bg-[#0077ED] transition-colors shadow-sm h-full cursor-pointer">
+        <Plus className="h-4 w-4" />
+        {dict.equipe_bouton_ajouter}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -67,27 +84,48 @@ export function AddUserModal({ projects }: { projects: Project[] }) {
               <Label htmlFor="email">{dict.equipe_col_email}</Label>
               <input id="email" name="email" type="email" required placeholder={dict.equipe_placeholder_email} className="w-full bg-gray-50 border border-gray-200 px-3 py-2 rounded-lg" />
             </div>
+            
             <div className="grid gap-2">
               <Label htmlFor="role">{dict.equipe_label_role}</Label>
-              <Select name="role" required defaultValue="artisan">
+              {/* Le composant est maintenant contrôlé via value et onValueChange */}
+              <Select name="role" required value={selectedRole} onValueChange={(val) => setSelectedRole(val || '')}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder={dict.equipe_label_role} />
+                  {/* On injecte explicitement le nom propre dans le SelectValue */}
+                  <SelectValue placeholder={dict.equipe_label_role}>
+                    {selectedRole ? getRoleDisplayName(selectedRole) : undefined}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="artisan">{dict.equipe_role_artisan}</SelectItem>
-                  <SelectItem value="maitre_oeuvre">{dict.equipe_role_moe}</SelectItem>
+                  {roles.map((roleObj: any) => {
+                    const rawValue = typeof roleObj === 'string' 
+                      ? roleObj 
+                      : (roleObj?.enum_value || roleObj?.enumlabel || Object.values(roleObj)[0]);
+                      
+                    if (!rawValue || typeof rawValue !== 'string') return null;
+
+                    return (
+                      <SelectItem key={rawValue} value={rawValue}>
+                        {getRoleDisplayName(rawValue)}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
+
             <div className="grid gap-2">
               <Label htmlFor="project_id">{dict.equipe_label_chantier}</Label>
-              <Select name="project_id">
+              <Select name="project_id" value={selectedProject} onValueChange={(val) => setSelectedProject(val || '')}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder={dict.equipe_placeholder_chantier} />
+                  <SelectValue placeholder={dict.equipe_placeholder_chantier}>
+                    {selectedProject ? projects.find(p => p.id === selectedProject)?.name : undefined}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>

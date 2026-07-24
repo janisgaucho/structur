@@ -14,9 +14,8 @@ import {
 const LANGUAGES = [
   { code: 'fr', label: 'Français' },
   { code: 'en', label: 'English' },
-  { code: 'pt', label: 'Português' },
-  { code: 'pl', label: 'Polski' },
-  { code: 'ro', label: 'Română' },
+  { code: 'es', label: 'Español' },
+  { code: 'ur', label: 'اردو' },
 ];
 
 export function LanguageSwitcher() {
@@ -42,7 +41,7 @@ export function LanguageSwitcher() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500 outline-none">
+      <DropdownMenuTrigger className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500 outline-none cursor-pointer">
         <Globe className="w-5 h-5" />
       </DropdownMenuTrigger>
       

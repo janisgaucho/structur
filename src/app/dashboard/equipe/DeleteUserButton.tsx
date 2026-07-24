@@ -23,7 +23,7 @@ export function DeleteUserButton({ userId }: { userId: string }) {
     <button
       onClick={handleClick}
       disabled={isPending}
-      className="text-red-600 hover:text-red-800 font-medium transition-colors disabled:text-gray-400 disabled:cursor-not-allowed"
+      className="text-red-600 hover:text-red-800 font-medium transition-colors disabled:text-gray-400 disabled:cursor-not-allowed cursor-pointer"
     >
       {isPending ? dict.equipe_bouton_suppression_en_cours : dict.equipe_bouton_supprimer}
     </button>

@@ -23,7 +23,7 @@ export function ProjectActions({ projectId }: { projectId: string }) {
     <DropdownMenuItem
       onClick={handleDelete}
       disabled={isPending}
-      className="cursor-pointer text-red-600 focus:bg-red-50 focus:text-red-600"
+      className="cursor-pointer text-red-600 focus:bg-red-50 focus:text-red-600 rounded-lg p-2 text-sm"
       onSelect={(e) => e.preventDefault()} // Empêche la fermeture du menu avant la fin
     >
       {isPending

@@ -46,7 +46,7 @@ export default async function LoginPage({
           </label>
 
           <div className="flex flex-col gap-3 mt-4">
-            <button formAction={login} className="bg-[#0071E3] text-white font-semibold py-3 rounded-lg hover:bg-[#0077ED] transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0071E3]">
+            <button formAction={login} className="bg-[#0071E3] text-white font-semibold py-3 rounded-lg hover:bg-[#0077ED] transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0071E3] cursor-pointer">
               Se connecter
             </button>
           </div>

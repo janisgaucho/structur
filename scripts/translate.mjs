@@ -18,7 +18,7 @@ try {
   }
 
   // 2. Configuration
-  const TARGET_LANGUAGES = ['pt', 'pl', 'ro', 'en']; // Portugais, Polonais, Roumain
+  const TARGET_LANGUAGES = ['es', 'ur', 'en']; // Portugais, Polonais, Roumain
   const SOURCE_FILE = resolve('src/dictionaries/fr.json');
   
   // Lecture du dictionnaire français

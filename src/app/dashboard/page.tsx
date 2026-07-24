@@ -26,16 +26,31 @@ export default async function DashboardPage() {
     return redirect('/login')
   }
 
-  const { data: projects, error } = await supabase
-    .from('projects')
-    .select(`
-      id,
-      name,
-      address,
-      status,
-      created_at
-    `)
-    .order('created_at', { ascending: false })
+  // Étape 1: Récupérer le profil de l'utilisateur pour connaître son rôle
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (profileError) {
+    console.error("Erreur de chargement du profil:", profileError.message);
+  }
+
+  let projectsQuery = supabase.from('projects').select(`id, name, address, status, created_at`);
+
+  // Étape 2: Adapter la requête en fonction du rôle
+  if (profile?.role === 'sous_traitant') {
+    // Pour les sous-traitants, on ne récupère que les chantiers auxquels ils sont assignés
+    // On utilise une jointure interne pour filtrer les projets.
+    projectsQuery = supabase
+      .from('projects')
+      .select('*, project_members!inner(user_id)')
+      .eq('project_members.user_id', user.id)
+  }
+
+  // Étape 3: Exécuter la requête finale
+  const { data: projects, error } = await projectsQuery.order('created_at', { ascending: false });
 
   if (error) {
     console.error("Erreur de chargement des projets:", error.message)
@@ -52,10 +67,15 @@ export default async function DashboardPage() {
             </h1>
             <p className="text-gray-500 text-sm mt-1">{dict.dashboard_subtitle}</p>
           </div>
-          <Link href="/dashboard/nouveau" className="inline-flex items-center justify-center gap-2 bg-[#0071E3] text-white pl-4 pr-5 py-2.5 rounded-full text-sm font-medium hover:bg-[#0077ED] transition-colors shadow-sm">
-            <Plus className="h-4 w-4" />
-            <span>{dict.dashboard_new_project_button}</span>
-          </Link>
+          {profile?.role !== 'sous_traitant' && (
+            <Link 
+              href="/dashboard/nouveau" 
+              className="inline-flex items-center justify-center gap-2 bg-[#0071E3] text-white pl-4 pr-5 py-2.5 rounded-full text-sm font-medium hover:bg-[#0077ED] transition-colors shadow-sm"
+            >
+              <Plus className="h-4 w-4" />
+              <span>{dict.dashboard_new_project_button}</span>
+            </Link>
+          )}
         </div>
 
         {projects && projects.length > 0 ? (
@@ -68,20 +88,19 @@ export default async function DashboardPage() {
                 </div>
                 <div className="mt-6 flex justify-between items-center">
                   <span className="text-xs text-gray-400 font-medium">{dict.dashboard_project_card_created_date} {new Date(project.created_at).toLocaleDateString('fr-FR')}</span>
-                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 capitalize">
-                    {project.status.replace('_', ' ')}
-                  </span>
                 </div>
                 <div className="absolute top-4 right-4">
                   <DropdownMenu>
-                    <DropdownMenuTrigger className="p-1.5 rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-200">
+                    <DropdownMenuTrigger className="p-1.5 rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-200 cursor-pointer">
                       <MoreVertical className="h-4 w-4" />
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-white rounded-xl shadow-lg border p-1 min-w-40">
-                      <DropdownMenuItem className="cursor-pointer text-gray-900 font-normal focus:bg-gray-100 focus:text-gray-900 rounded-lg p-2">
-                        <Link href={`/dashboard/chantier/${project.id}`}>
-                          {dict.dashboard_project_card_view}
-                        </Link>
+                    <DropdownMenuContent
+                      align="end"
+                      className="bg-white rounded-xl shadow-lg border p-1 min-w-40"
+
+                    >
+                      <DropdownMenuItem className="p-0 focus:bg-transparent">
+                        <Link href={`/dashboard/chantier/${project.id}`} className="block w-full p-2 text-sm text-gray-900 font-normal rounded-lg cursor-pointer hover:bg-gray-100">{dict.dashboard_project_card_view}</Link>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator className="my-1 bg-gray-100" />
                       <ProjectActions projectId={project.id} />

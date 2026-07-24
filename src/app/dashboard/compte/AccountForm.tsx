@@ -84,8 +84,8 @@ export function AccountForm({ user, profile, dict, message, successMessage }: { 
         <div className="mt-4 pt-6 border-t border-gray-100 flex justify-end">
           {isEditing ? (
             <div className='flex gap-3'>
-              <button type="button" onClick={() => setIsEditing(false)} className="px-6 py-2.5 rounded-full text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors">
-                Annuler
+              <button type="button" onClick={() => setIsEditing(false)} className="px-6 py-2.5 rounded-full text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer">
+                {dict.account_button_cancel}
               </button>
               <button type="submit" className="bg-blue-600 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm cursor-pointer">
                 {dict.account_button_save}
@@ -93,7 +93,7 @@ export function AccountForm({ user, profile, dict, message, successMessage }: { 
             </div>
           ) : (
             <button type="button" onClick={() => setIsEditing(true)} className="bg-blue-600 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm cursor-pointer">
-              Modifier les informations
+              {dict.account_button_edit}
             </button>
           )}
         </div>
